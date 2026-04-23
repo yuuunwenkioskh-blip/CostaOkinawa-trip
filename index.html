@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Costa沖繩郵輪小假期 🚢</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 overflow-x-hidden">
+    <div id="app" class="max-w-md mx-auto min-h-screen flex flex-col shadow-xl bg-white relative">
+        
+        <header class="bg-blue-600 text-white p-4 pt-8 sticky top-0 z-50 shadow-md">
+            <h1 class="text-xl font-bold flex items-center justify-between">
+                <span>Okinawa Cruise 🌊</span>
+                <span class="text-xs bg-blue-500 px-2 py-1 rounded-full border border-blue-400">2026/04/24-26</span>
+            </h1>
+        </header>
+
+        <main class="flex-1 overflow-y-auto pb-24">
+            
+            <div class="flex border-b sticky top-[64px] bg-white z-40">
+                <button @click="activeTab = 'itinerary'" :class="activeTab === 'itinerary' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'" class="flex-1 py-3 text-sm font-medium border-b-2 transition-all">
+                    <i class="fa-solid fa-calendar-day mr-1"></i> 行程表
+                </button>
+                <button @click="activeTab = 'split'" :class="activeTab === 'split' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'" class="flex-1 py-3 text-sm font-medium border-b-2 transition-all">
+                    <i class="fa-solid fa-calculator mr-1"></i> 分帳系統
+                </button>
+            </div>
+
+            <section v-if="activeTab === 'itinerary'" class="p-4 space-y-4 animate-fadeIn">
+                <div v-for="(day, index) in itinerary" :key="index" class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="font-bold text-lg text-blue-800">{{ day.date }}</h2>
+                        <span class="text-xs text-slate-400">Day {{ index + 1 }}</span>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div v-for="(event, eIndex) in day.events" :key="eIndex" class="flex gap-4 group">
+                            <div class="flex flex-col items-center">
+                                <div class="w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
+                                <div class="w-0.5 flex-1 bg-slate-100 my-1"></div>
+                            </div>
+                            <div class="flex-1 pb-4">
+                                <div class="flex justify-between">
+                                    <span class="text-xs font-mono font-bold text-slate-400">{{ event.time }}</span>
+                                    <button @click="removeEvent(index, eIndex)" class="text-slate-300 hover:text-red-400 transition-colors"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                                <p class="font-semibold text-slate-700 leading-tight">{{ event.desc }}</p>
+                                <div v-if="event.map" class="mt-2">
+                                    <a :href="event.map" target="_blank" class="inline-flex items-center text-xs bg-slate-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-50">
+                                        <i class="fa-solid fa-location-dot mr-1"></i> 導航至此
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button @click="openAddEvent(index)" class="w-full py-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 text-sm hover:border-blue-300 hover:text-blue-400 transition-all">
+                        + 新增行程
+                    </button>
+                </div>
+            </section>
+
+            <section v-if="activeTab === 'split'" class="p-4 animate-fadeIn">
+                <div class="bg-blue-50 rounded-xl p-4 mb-6">
+                    <p class="text-sm text-blue-600 mb-1">分帳總結 (誰該給誰錢)</p>
+                    <div v-if="splitSummary" class="text-xl font-bold text-blue-900">
+                        {{ splitSummary.from }} 應付給 {{ splitSummary.to }} : 
+                        <span class="text-blue-600">${{ splitSummary.amount }}</span>
+                    </div>
+                    <p v-else class="text-slate-400 italic">目前帳目平衡</p>
+                </div>
+
+                <div class="space-y-3">
+                    <div v-for="(expense, index) in expenses" :key="index" class="bg-white border rounded-lg p-3 flex justify-between items-center shadow-sm">
+                        <div>
+                            <p class="font-bold text-slate-700">{{ expense.item }}</p>
+                            <p class="text-xs text-slate-400">付錢的人: {{ expense.payer }}</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="font-mono font-bold text-emerald-600">${{ expense.amount }}</span>
+                            <button @click="removeExpense(index)" class="text-red-300 hover:text-red-500"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 bg-slate-100 rounded-xl p-4">
+                    <h3 class="font-bold text-slate-700 mb-3">新增支出</h3>
+                    <div class="space-y-3">
+                        <input v-model="newExpense.item" type="text" placeholder="項目名稱 (如：午餐)" class="w-full p-2 border rounded">
+                        <input v-model.number="newExpense.amount" type="number" placeholder="金額 (USD/TWD)" class="w-full p-2 border rounded">
+                        <select v-model="newExpense.payer" class="w-full p-2 border rounded">
+                            <option value="老公">老公 付錢</option>
+                            <option value="老婆">老婆 付錢</option>
+                        </select>
+                        <button @click="addExpense" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow-lg active:scale-95 transition-all">
+                            紀錄一筆
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <div v-if="showModal" class="fixed inset-0 bg-black/50 z-[100] flex items-end sm:items-center justify-center p-4">
+            <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-6 animate-slideUp">
+                <h3 class="font-bold text-xl mb-4">新增 {{ itinerary[activeDayIndex].date }} 的行程</h3>
+                <div class="space-y-4">
+                    <input v-model="newEvent.time" type="time" class="w-full p-3 border rounded-xl">
+                    <input v-model="newEvent.desc" type="text" placeholder="做什麼事？" class="w-full p-3 border rounded-xl">
+                    <div class="flex gap-2">
+                        <button @click="showModal = false" class="flex-1 py-3 text-slate-500 font-bold">取消</button>
+                        <button @click="addEvent" class="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold">確認新增</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="fixed bottom-0 max-w-md w-full bg-white/80 backdrop-blur-md p-3 border-t text-center text-[10px] text-slate-400 safe-area-bottom">
+            提醒：不託運行李者，回程液體限額請務必遵守機場規定。
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed } = Vue;
+
+        createApp({
+            setup() {
+                const activeTab = ref('itinerary');
+                const showModal = ref(false);
+                const activeDayIndex = ref(0);
+
+                const itinerary = ref([
+                    {
+                        date: '4/24 (五) 基隆啟航',
+                        events: [
+                            { time: '07:00', desc: '抵達桃機星威停車場 (HSBC權益)', map: 'https://www.google.com/maps/search/星威停車場' },
+                            { time: '09:00', desc: '抵達基隆港報到 (不需託運，直接通關)', map: 'https://www.google.com/maps/search/基隆港西碼頭' },
+                            { time: '14:00', desc: 'Costa Serena 啟航 🚢' },
+                            { time: '20:00', desc: '船上晚餐 & 數位演習 (App確認)' }
+                        ]
+                    },
+                    {
+                        date: '4/25 (六) 那霸落地',
+                        events: [
+                            { time: '09:00', desc: '抵達那霸港 (優先下船) 🇯🇵' },
+                            { time: '11:00', desc: 'Mercure Naha 寄放行李 (壺川站)', map: 'https://www.google.com/maps/search/Mercure+Okinawa+Naha' },
+                            { time: '20:00', desc: '奧武山公園散步 (皮克敏神社盆栽)', map: 'https://www.google.com/maps/search/奧武山公園' },
+                            { time: '21:00', desc: 'Hello Cycling 租借體驗 (壺川站前)', map: 'https://www.google.com/maps/search/Hello+Cycling+Tsubogawa' }
+                        ]
+                    },
+                    {
+                        date: '4/26 (日) 返台賦歸',
+                        events: [
+                            { time: '11:00', desc: 'Accor Gold 延遲退房散步' },
+                            { time: '18:30', desc: '抵達那霸機場 (OKA) 刷皮克敏飛機飾品', map: 'https://www.google.com/maps/search/那霸機場' },
+                            { time: '20:55', desc: '華航 CI123 起飛 (SkyTeam Elite+)' },
+                            { time: '21:30', desc: '抵達桃機 T2 取車回家' }
+                        ]
+                    }
+                ]);
+
+                const expenses = ref([
+                    { item: '郵輪規費', payer: '老婆', amount: 108 },
+                    { item: 'Accor 住宿費', payer: '老公', amount: 140 }
+                ]);
+
+                const newExpense = ref({ item: '', amount: null, payer: '老公' });
+                const newEvent = ref({ time: '12:00', desc: '' });
+
+                const addExpense = () => {
+                    if (newExpense.value.item && newExpense.value.amount) {
+                        expenses.value.push({ ...newExpense.value });
+                        newExpense.value = { item: '', amount: null, payer: '老公' };
+                    }
+                };
+
+                const removeExpense = (index) => expenses.value.splice(index, 1);
+
+                const splitSummary = computed(() => {
+                    let total = 0;
+                    let paidByHusband = 0;
+                    expenses.value.forEach(ex => {
+                        total += ex.amount;
+                        if (ex.payer === '老公') paidByHusband += ex.amount;
+                    });
+                    
+                    const perPerson = total / 2;
+                    const diff = paidByHusband - perPerson;
+                    
+                    if (Math.abs(diff) < 0.1) return null;
+                    return diff > 0 
+                        ? { from: '老婆', to: '老公', amount: diff.toFixed(2) }
+                        : { from: '老公', to: '老婆', amount: Math.abs(diff).toFixed(2) };
+                });
+
+                const openAddEvent = (dayIndex) => {
+                    activeDayIndex.value = dayIndex;
+                    showModal.value = true;
+                };
+
+                const addEvent = () => {
+                    if (newEvent.value.desc) {
+                        itinerary.value[activeDayIndex.value].events.push({ ...newEvent.value });
+                        itinerary.value[activeDayIndex.value].events.sort((a, b) => a.time.localeCompare(b.time));
+                        showModal.value = false;
+                        newEvent.value = { time: '12:00', desc: '' };
+                    }
+                };
+
+                const removeEvent = (dayIndex, eventIndex) => {
+                    itinerary.value[dayIndex].events.splice(eventIndex, 1);
+                };
+
+                return {
+                    activeTab, itinerary, expenses, newExpense, addExpense, removeExpense, 
+                    splitSummary, showModal, activeDayIndex, openAddEvent, newEvent, addEvent, removeEvent
+                };
+            }
+        }).mount('#app');
+    </script>
+
+    <style>
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+        .animate-slideUp { animation: slideUp 0.3s ease-out forwards; }
+    </style>
+</body>
+</html>
